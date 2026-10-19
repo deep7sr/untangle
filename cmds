@@ -13,3 +13,11 @@ cp /c/dev/laptop-backup/claude-memory/*.md ~/.claude/projects/c--dev-ainops-plat
 
 cd /c/dev/ainops-platform/backend && uv sync
 cd /c/dev/ainops-platform/frontend && npm ci
+
+
+
+
+winget install Git.Git
+winget install Microsoft.VisualStudioCode
+winget install OpenJS.NodeJS.LTS
+winget install astral-sh.uv
