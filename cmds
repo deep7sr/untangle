@@ -1,0 +1,15 @@
+git clone https://github.com/deep7sr/ainops-platform-backup.git /c/dev/ainops-platform
+
+cd /c/dev/ainops-platform
+git checkout demo/agentic
+
+git worktree add --detach /c/dev/laptop-backup origin/backup/laptop-2026-10-19
+cp /c/dev/laptop-backup/newf .env
+cp -r /c/dev/laptop-backup/logs .
+mkdir -p ~/.claude/projects/c--dev-ainops-platform/memory
+cp /c/dev/laptop-backup/claude-memory/*.md ~/.claude/projects/c--dev-ainops-platform/memory/
+
+
+
+cd /c/dev/ainops-platform/backend && uv sync
+cd /c/dev/ainops-platform/frontend && npm ci
