@@ -1,0 +1,419 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>AINOPS POC Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: one reading column; the two diagrams break out to full width and scroll on their own when narrow. */
+  :root {
+    --bg: #f5f8f8;
+    --surface: #ffffff;
+    --group: #eaf1f1;
+    --box: #ffffff;
+    --fg: #231f20;
+    --muted: #586265;
+    --line: #c4cfd0;
+    --accent: #006e74;
+    --accent-soft: #dcefef;
+    --support: #7b8789;
+    --on-accent: #ffffff;
+    --font-sans: 'Inter', 'Aptos', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141819; --surface: #1c2223; --group: #1a2021; --box: #242b2c; --fg: #e9edee;
+      --muted: #9ba6a8; --line: #3b4648; --accent: #1fa9bd; --accent-soft: #123438;
+      --support: #839092; --on-accent: #0b1415; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141819; --surface: #1c2223; --group: #1a2021; --box: #242b2c; --fg: #e9edee;
+    --muted: #9ba6a8; --line: #3b4648; --accent: #1fa9bd; --accent-soft: #123438;
+    --support: #839092; --on-accent: #0b1415; color-scheme: dark;
+  }
+
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 15px; line-height: 1.55; }
+  .page { max-width: 1180px; margin-inline: auto; padding-inline: 20px; padding-block: 36px 64px; display: flex; flex-direction: column; gap: 40px; }
+  .col { max-width: 72ch; }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 30px; line-height: 1.15; font-weight: 700; margin: 0; text-wrap: balance; }
+  h2 { font-size: 19px; line-height: 1.25; font-weight: 600; margin: 0 0 12px; text-wrap: balance; }
+  p { margin: 0; }
+  .lede { font-size: 17px; color: var(--muted); max-width: 68ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--muted); }
+  .meta b { color: var(--fg); font-weight: 600; }
+  code { font-family: var(--font-mono); font-size: 0.9em; }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .canvas { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; padding: 14px; }
+  .canvas svg { display: block; width: 100%; min-width: 980px; height: auto; }
+  figcaption { font-size: 13.5px; color: var(--muted); max-width: 86ch; }
+  figcaption b { color: var(--fg); font-weight: 600; }
+
+  /* diagram marks */
+  svg text { font-family: var(--font-sans); fill: var(--fg); }
+  .t-title { font-size: 13px; font-weight: 600; }
+  .t-sub { font-size: 10.5px; fill: var(--muted); }
+  .t-lab { font-size: 10.5px; }
+  .t-mono { font-family: var(--font-mono); font-size: 10.5px; }
+  .t-badge { font-size: 10.5px; font-weight: 700; fill: var(--on-accent); }
+  .b-box { fill: var(--box); stroke: var(--line); stroke-width: 1; }
+  .b-group { fill: var(--group); stroke: var(--line); stroke-width: 1; }
+  .b-ext { fill: var(--box); stroke: var(--muted); stroke-width: 1; stroke-dasharray: 5 4; }
+  .b-note { fill: var(--group); stroke: none; }
+  .b-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; }
+  .f-main { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+  .f-side { stroke: var(--support); stroke-width: 1.4; fill: none; }
+  .m-main { fill: var(--accent); }
+  .m-side { fill: var(--support); }
+  .badge { fill: var(--accent); }
+
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px 48px; max-width: 1040px; }
+  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; min-width: 0; }
+  ol.steps li::before { content: counter(s); width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 11.5px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  ol.steps b { font-weight: 600; }
+
+  ul.rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; max-width: 80ch; }
+  ul.rules b { font-weight: 600; }
+
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 14px 9px 0; border-bottom: 1px solid var(--line); }
+  th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td.num { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 36px; }
+  .two > section { min-width: 0; }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">AINOPS · proof of concept</div>
+    <h1>POC architecture</h1>
+    <p class="lede">How a plain-language question becomes a read-only diagnosis with evidence, on the 8-device lab.</p>
+    <div class="meta">
+      <span><b>For</b> architecture review</span>
+      <span><b>Branch</b> <code>demo/agentic</code></span>
+      <span><b>Date</b> 12 October 2026</span>
+      <span><b>Prepared by</b> Deependra Singh Rajput</span>
+    </div>
+  </header>
+
+  <figure>
+    <div class="canvas">
+      <svg viewBox="0 0 1200 800" role="img" aria-label="AINOPS components and the path of one investigation: engineer, web UI, API process with the agent loop and code checks, LLM provider, two MCP servers, Neo4j graph and the EVE-NG lab.">
+        <defs>
+          <marker id="am" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="m-main"/></marker>
+          <marker id="as" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="m-side"/></marker>
+        </defs>
+
+        <!-- engineer and web UI -->
+        <rect x="30" y="40" width="150" height="60" rx="8" class="b-box"/>
+        <text x="105" y="66" text-anchor="middle" class="t-title">Network engineer</text>
+        <text x="105" y="84" text-anchor="middle" class="t-sub">plain-language question</text>
+
+        <rect x="330" y="40" width="360" height="60" rx="8" class="b-box"/>
+        <text x="510" y="66" text-anchor="middle" class="t-title">Web UI</text>
+        <text x="510" y="84" text-anchor="middle" class="t-sub">React + Vite · :5173</text>
+
+        <line x1="184" y1="70" x2="326" y2="70" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <text x="255" y="55" text-anchor="middle" class="t-lab">asks, replies, reviews</text>
+        <text x="255" y="93" text-anchor="middle" class="t-lab">live steps, report</text>
+        <circle cx="255" cy="70" r="9" class="badge"/><text x="255" y="73.7" text-anchor="middle" class="t-badge">1</text>
+
+        <!-- files on disk -->
+        <rect x="30" y="200" width="170" height="244" rx="8" class="b-note"/>
+        <text x="44" y="224" class="t-title">Files on disk</text>
+        <text x="44" y="250" class="t-mono">.env</text>
+        <text x="44" y="264" class="t-sub">keys and device logins</text>
+        <text x="44" y="290" class="t-mono">lab/inventory.yaml</text>
+        <text x="44" y="304" class="t-sub">the device list</text>
+        <text x="44" y="330" class="t-mono">commands.yaml</text>
+        <text x="44" y="344" class="t-sub">the only commands allowed</text>
+        <text x="44" y="370" class="t-mono">skills/*/SKILL.md</text>
+        <text x="44" y="384" class="t-sub">expert procedures</text>
+        <text x="44" y="410" class="t-mono">logs/</text>
+        <text x="44" y="424" class="t-sub">audit log, saved runs</text>
+
+        <!-- API process -->
+        <rect x="230" y="160" width="560" height="320" rx="12" class="b-group"/>
+        <text x="774" y="184" text-anchor="end" class="t-title">API process · FastAPI · :8000</text>
+
+        <rect x="250" y="200" width="210" height="58" rx="8" class="b-box"/>
+        <text x="355" y="225" text-anchor="middle" class="t-title">Runs and conversation</text>
+        <text x="355" y="243" text-anchor="middle" class="t-sub">steps saved · up to 8 messages</text>
+
+        <rect x="560" y="200" width="210" height="58" rx="8" class="b-box"/>
+        <text x="665" y="225" text-anchor="middle" class="t-title">Agent loop</text>
+        <text x="665" y="243" text-anchor="middle" class="t-sub">LangChain · the LLM picks each check</text>
+
+        <rect x="250" y="300" width="210" height="58" rx="8" class="b-box"/>
+        <text x="355" y="325" text-anchor="middle" class="t-title">Report check</text>
+        <text x="355" y="343" text-anchor="middle" class="t-sub">code: citations, confidence</text>
+
+        <rect x="560" y="300" width="210" height="58" rx="8" class="b-box"/>
+        <text x="665" y="325" text-anchor="middle" class="t-title">Tool-call checks</text>
+        <text x="665" y="343" text-anchor="middle" class="t-sub">code: 16 calls max, seen IPs only</text>
+
+        <rect x="250" y="400" width="210" height="58" rx="8" class="b-box"/>
+        <text x="355" y="425" text-anchor="middle" class="t-title">Cases, hints, discovery</text>
+        <text x="355" y="443" text-anchor="middle" class="t-sub">code only, no LLM</text>
+
+        <!-- 2: UI and API -->
+        <line x1="355" y1="104" x2="355" y2="196" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="355" cy="132" r="9" class="badge"/><text x="355" y="135.7" text-anchor="middle" class="t-badge">2</text>
+        <text x="372" y="128" class="t-lab">REST: question, replies, case review</text>
+        <text x="372" y="143" class="t-lab">SSE: live steps and report</text>
+
+        <!-- runs to agent -->
+        <line x1="460" y1="218" x2="556" y2="218" class="f-main" marker-end="url(#am)"/>
+        <text x="508" y="210" text-anchor="middle" class="t-lab">question, hints</text>
+
+        <!-- 4: agent and LLM -->
+        <rect x="950" y="190" width="220" height="78" rx="8" class="b-ext"/>
+        <text x="1060" y="217" text-anchor="middle" class="t-title">LLM provider</text>
+        <text x="1060" y="235" text-anchor="middle" class="t-sub">Groq in the lab</text>
+        <text x="1060" y="251" text-anchor="middle" class="t-sub">Azure OpenAI also supported</text>
+        <text x="1060" y="286" text-anchor="middle" class="t-sub">HTTPS · the only call to the internet</text>
+        <line x1="774" y1="229" x2="946" y2="229" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="860" cy="229" r="9" class="badge"/><text x="860" y="232.7" text-anchor="middle" class="t-badge">4</text>
+        <text x="866" y="213" text-anchor="middle" class="t-lab">prompt, tool results</text>
+        <text x="866" y="251" text-anchor="middle" class="t-lab">tool choice, then report</text>
+
+        <!-- 5: agent and checks -->
+        <line x1="665" y1="262" x2="665" y2="296" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="665" cy="279" r="8" class="badge"/><text x="665" y="282.7" text-anchor="middle" class="t-badge">5</text>
+        <text x="680" y="283" class="t-lab">call + reason</text>
+
+        <!-- 8: agent to report check -->
+        <polyline points="560,244 510,244 510,329 464,329" class="f-main" marker-end="url(#am)"/>
+        <circle cx="510" cy="302" r="8" class="badge"/><text x="510" y="305.7" text-anchor="middle" class="t-badge">8</text>
+        <text x="520" y="280" class="t-lab">report draft</text>
+
+        <!-- 9: report check to runs -->
+        <line x1="300" y1="300" x2="300" y2="262" class="f-main" marker-end="url(#am)"/>
+        <circle cx="300" cy="281" r="8" class="badge"/><text x="300" y="284.7" text-anchor="middle" class="t-badge">9</text>
+        <text x="316" y="285" class="t-lab">report + confidence</text>
+
+        <!-- 10: report check to cases -->
+        <line x1="400" y1="358" x2="400" y2="396" class="f-main" marker-end="url(#am)"/>
+        <circle cx="400" cy="375" r="8" class="badge"/><text x="400" y="378.7" text-anchor="middle" class="t-badge">10</text>
+        <text x="386" y="379" text-anchor="end" class="t-lab">case draft</text>
+
+        <!-- 6: checks to MCP servers -->
+        <line x1="600" y1="362" x2="600" y2="536" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <line x1="730" y1="362" x2="730" y2="536" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="600" cy="420" r="9" class="badge"/><text x="600" y="423.7" text-anchor="middle" class="t-badge">6</text>
+        <circle cx="730" cy="420" r="9" class="badge"/><text x="730" y="423.7" text-anchor="middle" class="t-badge">6</text>
+        <text x="665" y="417" text-anchor="middle" class="t-lab">tool call down</text>
+        <text x="665" y="432" text-anchor="middle" class="t-lab">result [E#] up</text>
+        <text x="590" y="514" text-anchor="end" class="t-lab">MCP over HTTP · graph questions</text>
+        <text x="740" y="514" class="t-lab">MCP over HTTP · live device checks</text>
+
+        <!-- MCP servers -->
+        <rect x="470" y="540" width="180" height="84" rx="8" class="b-box"/>
+        <text x="560" y="566" text-anchor="middle" class="t-title">Topology MCP server</text>
+        <text x="560" y="584" text-anchor="middle" class="t-sub">:8102 · 5 tools</text>
+        <text x="560" y="601" text-anchor="middle" class="t-sub">answers from the graph</text>
+
+        <rect x="690" y="540" width="480" height="84" rx="8" class="b-box"/>
+        <text x="930" y="566" text-anchor="middle" class="t-title">Network MCP server</text>
+        <text x="930" y="584" text-anchor="middle" class="t-sub">:8101 · 13 read-only tools</text>
+        <text x="930" y="601" text-anchor="middle" class="t-sub">allow-listed commands · guard · redaction · audit log (figure 2)</text>
+
+        <!-- stores -->
+        <rect x="250" y="690" width="400" height="84" rx="8" class="b-box"/>
+        <text x="450" y="716" text-anchor="middle" class="t-title">Neo4j knowledge graph</text>
+        <text x="450" y="734" text-anchor="middle" class="t-sub">:7687 (Bolt) · devices, interfaces, links</text>
+        <text x="450" y="751" text-anchor="middle" class="t-sub">expected OSPF neighbours · cases</text>
+
+        <rect x="800" y="690" width="370" height="84" rx="8" class="b-box"/>
+        <text x="985" y="716" text-anchor="middle" class="t-title">EVE-NG lab</text>
+        <text x="985" y="734" text-anchor="middle" class="t-sub">8 devices: 6 Cisco IOS, 2 Juniper vSRX</text>
+        <text x="985" y="751" text-anchor="middle" class="t-sub">sites TRV and MAA, one leased line</text>
+
+        <!-- 3: API and Neo4j -->
+        <line x1="330" y1="462" x2="330" y2="686" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="330" cy="544" r="9" class="badge"/><text x="330" y="547.7" text-anchor="middle" class="t-badge">3</text>
+        <text x="314" y="541" text-anchor="end" class="t-lab">reads: similar cases, map</text>
+        <text x="314" y="556" text-anchor="end" class="t-lab">writes: cases, discovery results</text>
+
+        <!-- supporting reads -->
+        <line x1="560" y1="624" x2="560" y2="686" class="f-side" marker-end="url(#as)"/>
+        <text x="572" y="660" class="t-lab">reads</text>
+        <polyline points="720,624 720,732 654,732" class="f-side" marker-end="url(#as)"/>
+        <text x="732" y="650" class="t-lab">reads only: address owners,</text>
+        <text x="732" y="665" class="t-lab">expected OSPF neighbours</text>
+
+        <!-- 7: network server and lab -->
+        <line x1="1040" y1="628" x2="1040" y2="686" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <circle cx="1040" cy="657" r="9" class="badge"/><text x="1040" y="660.7" text-anchor="middle" class="t-badge">7</text>
+        <text x="1056" y="653" class="t-lab">Telnet to consoles</text>
+        <text x="1056" y="668" class="t-lab">show and ping only</text>
+
+        <!-- legend -->
+        <text x="30" y="652" class="t-title">How to read it</text>
+        <line x1="30" y1="674" x2="62" y2="674" class="f-main" marker-end="url(#am)"/>
+        <text x="78" y="678" class="t-lab">investigation path, numbered</text>
+        <line x1="34" y1="698" x2="62" y2="698" class="f-main" marker-start="url(#am)" marker-end="url(#am)"/>
+        <text x="78" y="702" class="t-lab">request and response</text>
+        <line x1="30" y1="722" x2="62" y2="722" class="f-side" marker-end="url(#as)"/>
+        <text x="78" y="726" class="t-lab">supporting read</text>
+        <rect x="30" y="738" width="36" height="16" rx="4" class="b-ext"/>
+        <text x="78" y="750" class="t-lab">external service</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 1. Components and the path of one investigation.</b> The LLM chooses what to check and writes the report. Everything else is code: the checks around each tool call, the commands that reach a device, the report check, cases, hints and discovery. The numbers match the steps below.</figcaption>
+  </figure>
+
+  <section>
+    <h2>One investigation, step by step</h2>
+    <ol class="steps">
+      <li><span>The engineer types a question in the web UI.</span></li>
+      <li><span>The UI posts it to the API. The API starts a run and streams every step back live.</span></li>
+      <li><span>Code looks up approved past cases that resemble the question and passes at most three as <b>hints</b>. Hints are never evidence.</span></li>
+      <li><span>The agent sends the instructions, the list of live skills, the hints and the question to the LLM. The LLM answers with a tool to call and a one-sentence reason.</span></li>
+      <li><span>Code checks the call before it leaves: at most 16 calls per reply, and only IP addresses seen in the question or in earlier results. Each allowed call gets an evidence id (E1, E2 and so on).</span></li>
+      <li><span>The call goes over MCP to one of two servers: Topology (what the graph knows) or Network (what the devices say now). The result returns to the LLM, which picks the next check. Steps 4 to 6 repeat.</span></li>
+      <li><span>For a device check, the Network server sends one allow-listed, read-only command to the device console and cleans the output (figure 2).</span></li>
+      <li><span>When the evidence explains the problem, the LLM writes a structured report that cites evidence ids.</span></li>
+      <li><span>Code checks the report: citations that do not exist are removed, and the confidence (high, medium or low) is computed from the evidence. The engineer sees it and can reply to continue the conversation.</span></li>
+      <li><span>After a diagnosis, code drafts a case. An engineer approves, corrects or rejects it. Approved cases are stored in the graph and feed step 3.</span></li>
+    </ol>
+  </section>
+
+  <figure>
+    <div class="canvas">
+      <svg viewBox="0 0 1200 236" role="img" aria-label="The eight steps inside one Network MCP tool call: find the device, validate arguments, look up the command, guard, run on the device, redact, parse, health verdict; every call is audited.">
+        <defs>
+          <marker id="bm" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="m-main"/></marker>
+        </defs>
+
+        <text x="5" y="22" class="t-lab">tool call from the agent, for example get_interfaces on IPLC-RTR-MAA</text>
+        <line x1="68" y1="30" x2="68" y2="46" class="f-main" marker-end="url(#bm)"/>
+        <text x="1195" y="22" text-anchor="end" class="t-lab">result and evidence back to the agent</text>
+        <line x1="1132" y1="50" x2="1132" y2="34" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="5" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="68" y="79" text-anchor="middle" class="t-title">1 Find device</text>
+        <text x="68" y="97" text-anchor="middle" class="t-sub">in the inventory</text>
+        <line x1="131" y1="83" x2="153" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="157" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="220" y="79" text-anchor="middle" class="t-title">2 Validate</text>
+        <text x="220" y="97" text-anchor="middle" class="t-sub">interface, IP address</text>
+        <line x1="283" y1="83" x2="305" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="309" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="372" y="79" text-anchor="middle" class="t-title">3 Look up</text>
+        <text x="372" y="97" text-anchor="middle" class="t-mono">commands.yaml</text>
+        <line x1="435" y1="83" x2="457" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="461" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="524" y="79" text-anchor="middle" class="t-title">4 Guard</text>
+        <text x="524" y="97" text-anchor="middle" class="t-sub">show and ping only</text>
+        <line x1="587" y1="83" x2="609" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="613" y="50" width="126" height="66" rx="8" class="b-hot"/>
+        <text x="676" y="79" text-anchor="middle" class="t-title">5 Run on device</text>
+        <text x="676" y="97" text-anchor="middle" class="t-sub">Netmiko over Telnet</text>
+        <line x1="739" y1="83" x2="761" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="765" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="828" y="79" text-anchor="middle" class="t-title">6 Redact</text>
+        <text x="828" y="97" text-anchor="middle" class="t-sub">secrets removed</text>
+        <line x1="891" y1="83" x2="913" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="917" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="980" y="79" text-anchor="middle" class="t-title">7 Parse</text>
+        <text x="980" y="97" text-anchor="middle" class="t-sub">JSON and a summary</text>
+        <line x1="1043" y1="83" x2="1065" y2="83" class="f-main" marker-end="url(#bm)"/>
+
+        <rect x="1069" y="50" width="126" height="66" rx="8" class="b-box"/>
+        <text x="1132" y="79" text-anchor="middle" class="t-title">8 Health verdict</text>
+        <text x="1132" y="97" text-anchor="middle" class="t-sub">ok or problem, by code</text>
+
+        <path d="M5 128 v8 H587 v-8" class="f-side"/>
+        <text x="296" y="156" text-anchor="middle" class="t-lab">A failure here stops the call. Nothing is sent to the device.</text>
+        <path d="M613 128 v8 H739 v-8" class="f-side"/>
+        <text x="676" y="156" text-anchor="middle" class="t-lab">one command</text>
+        <path d="M765 128 v8 H1195 v-8" class="f-side"/>
+        <text x="980" y="156" text-anchor="middle" class="t-lab">The LLM only ever sees this cleaned result.</text>
+
+        <rect x="5" y="180" width="1190" height="40" rx="8" class="b-note"/>
+        <text x="600" y="204.5" text-anchor="middle" class="t-lab">Audit log: one line for every call (tool, device, command, outcome), including refused and failed calls</text>
+      </svg>
+    </div>
+    <figcaption><b>Figure 2. Inside one Network MCP tool call.</b> The LLM never writes a command. It names a tool, and code turns that into one reviewed command. Step 5 is the only point that touches a device.</figcaption>
+  </figure>
+
+  <section>
+    <h2>What the design guarantees</h2>
+    <ul class="rules">
+      <li><b>The LLM never writes a device command.</b> It picks a tool; the command comes from a file reviewed by the network expert.</li>
+      <li><b>Read-only, checked twice.</b> Only <code>show</code> and <code>ping</code> can reach a device: first the allow-list, then a guard that refuses anything else.</li>
+      <li><b>Secrets stay inside.</b> Passwords and keys are removed from device output before it is stored, shown or sent to the LLM.</li>
+      <li><b>Every fact cites a check.</b> A report can only cite evidence ids that exist, and the confidence is computed by code.</li>
+      <li><b>People approve the knowledge.</b> Skills and cases are reviewed by engineers. They steer an investigation and never count as evidence.</li>
+      <li><b>The network model is built by code.</b> Discovery reads the devices through the same Network server and writes the graph, with no LLM involved.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Components</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Component</th><th>Built with</th><th>Port</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Web UI</td><td>React 19, TypeScript, Vite, Tailwind</td><td class="num">5173</td><td>Ask, watch the live steps and map, read the report, review cases, edit skills</td></tr>
+          <tr><td>API</td><td>Python 3.12, FastAPI, LangChain</td><td class="num">8000</td><td>Runs and conversations, the agent loop, code checks, cases, hints, discovery</td></tr>
+          <tr><td>Topology MCP server</td><td>MCP over streamable HTTP</td><td class="num">8102</td><td>5 tools that answer from the graph: find a device or IP, links, path</td></tr>
+          <tr><td>Network MCP server</td><td>MCP over streamable HTTP, Netmiko</td><td class="num">8101</td><td>13 read-only tools on live devices: interfaces, routes, OSPF, ping, route trace, firewall zones</td></tr>
+          <tr><td>Knowledge graph</td><td>Neo4j</td><td class="num">7687</td><td>Devices, interfaces, links, expected OSPF neighbours, reviewed cases</td></tr>
+          <tr><td>LLM</td><td>Groq (OpenAI-compatible API); Azure OpenAI supported</td><td class="num">external</td><td>Chooses the next check and writes the report</td></tr>
+          <tr><td>Lab</td><td>EVE-NG</td><td class="num">consoles</td><td>6 Cisco IOS routers and switches, 2 Juniper vSRX firewalls, two sites</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="two">
+    <section>
+      <h2>POC shortcuts, by choice</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Area</th><th>In the POC</th><th>In production</th></tr></thead>
+          <tbody>
+            <tr><td>Device access</td><td>Telnet to lab consoles</td><td>SSH through collectors</td></tr>
+            <tr><td>Credentials</td><td><code>.env</code> on the laptop</td><td>Vault, TACACS</td></tr>
+            <tr><td>Users</td><td>No login</td><td>SSO and roles</td></tr>
+            <tr><td>Inventory</td><td>A YAML file</td><td>Sync from the source of truth</td></tr>
+            <tr><td>Run history</td><td>Files, loaded at start</td><td>A database</td></tr>
+            <tr><td>Concurrency</td><td>One API process</td><td>Queue and workers</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Not yet proven</h2>
+      <ul class="rules">
+        <li><b>Latest features with a real LLM.</b> Conversation, cases, hints and the skills editor pass their code tests but have not run against a live model yet.</li>
+        <li><b>More than one path.</b> The lab has a single path between the sites. The route trace follows only the first of several equal-cost paths.</li>
+        <li><b>Scale.</b> Everything has run on 8 devices only.</li>
+      </ul>
+      <h2 style="margin-top:28px">Open points for review</h2>
+      <ul class="rules">
+        <li>Is Neo4j allowed at UST, or should the graph live in an existing tool?</li>
+        <li>Which LLM endpoint for the demo? The company Azure deployment is reachable only from the UST network.</li>
+        <li>Is read-only the agreed scope for phase 1? It has not been confirmed since the redesign.</li>
+      </ul>
+    </section>
+  </div>
+
+</div>
+
+</body></html>
